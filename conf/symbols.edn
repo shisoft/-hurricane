@@ -1,3 +1,4 @@
 {map {:mapper  constantly
-      :reducer constantly}
+      :reducer constantly
+      :replacement hmap}
  }
