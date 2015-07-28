@@ -7,7 +7,8 @@
   (symbol (str "hurricane.compiler.funcs/" (name (get-in symbols [exp :replacement])))))
 
 (defmacro hurricane [[data-source & opts] & body]
-  `(do ~@(map
+  `(do ()
+       ~@(map
            (fn [line]
              (walk/prewalk
                (fn [exp]
