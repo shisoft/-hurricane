@@ -50,6 +50,7 @@
                          "-v" (str proj-path ":" "/opt")
                          "-p" (str worker-port ":" worker-port)
                          "-d"
+                         "clojure"
                          "lein" "trampoline" "run"
                          "worker"
                          (str "--port=" worker-port)
