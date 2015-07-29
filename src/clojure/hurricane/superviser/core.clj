@@ -1,28 +1,30 @@
 (ns hurricane.superviser.core
-  (:require [hurricane.superviser.caches :refer [pending-reqs]]
-            [leiningen.core.classpath :as classpath]
-            [cluster-connector.remote-function-invocation.core :as rfi]
+  (:require [cluster-connector.remote-function-invocation.core :as rfi]
             [cluster-connector.distributed-store.core :as ds]
             [clojure.java.shell :refer [sh]]
-            [clojure.core.async :refer [put! chan <!!]])
+            [clojure.core.async :refer [put! chan <!!]]
+            [cluster-connector.sharding.core :refer [register-as-master]])
   (:import (hurricane.stream UnzipUtility)
-           (java.io File)))
+           (java.io File)
+           [java.lang Runtime]))
 
-(def cluster-conf (read-string (slurp "conf/cluster.edn")))
 (def new-worker-awaits (atom {}))
-(def worker-port-counter (atom {}))
+(def worker-port-counter (atom 1900))
 (def containers (atom {}))
+(def use-docker? (atom false))
 
 (defn next-worker-port []
   (locking worker-port-counter
     (swap! worker-port-counter inc)
     @worker-port-counter))
 
-(defn start-server [zk-addr]
+(defn start-server [zk-addr docker?]
+  (reset! use-docker? docker?)
   (ds/join-cluster
-    :hurricane :superviser 13999 (or zk-addr (:zk cluster-conf)) {}
+    :hurricane :superviser 13999 zk-addr {}
     :connected-fn
     (fn [& _]
+      (register-as-master)
       (rfi/start-server 13999))
     :expired-fn
     (fn [& _]
@@ -37,26 +39,48 @@
           proj-path    (str (System/getProperty "java.io.tmpdir") id ".proj")]
       (swap! new-worker-awaits assoc worker-port await-chan)
       (.mkdirs (File. proj-path))
+      (println "Unpack Project")
       (UnzipUtility/writeBytesToFile proj package-path)
       (UnzipUtility/unzip package-path proj-path)
-      (sh "nohup"
-          "lein" "trampoline" "run"
-          "worker"
-          (str "--port=" worker-port)
-          (str "--zk="   @ds/zk-addr)
-          (str "--sn="   @ds/this-server-name)
-          (str "--wd="   proj-path)
-          (str "--id="   id))
+      (println "Starting Container")
+      (let [start-cmd (if @use-docker?
+                        ["docker" "run"
+                         "--name" container-name
+                         "-v" (str (System/getProperty "user.dir") ":" "/tmp")
+                         "-v" (str proj-path ":" "/opt")
+                         "-p" (str worker-port ":" worker-port)
+                         "-d"
+                         "lein" "trampoline" "run"
+                         "worker"
+                         (str "--port=" worker-port)
+                         (str "--zk="   @ds/zk-addr)
+                         (str "--sn="   @ds/this-server-name)
+                         (str "--wd="   "/opt")
+                         (str "--id="   id)]
+                        ["lein" "trampoline" "run"
+                         "worker"
+                         (str "--port=" worker-port)
+                         (str "--zk="   @ds/zk-addr)
+                         (str "--sn="   @ds/this-server-name)
+                         (str "--wd="   proj-path)
+                         (str "--id="   id)])]
+        (println start-cmd)
+        (future (. (Runtime/getRuntime) exec (into-array start-cmd))))
+      (println "Container Started, waiting for startup")
       (let [worker-name (<!! await-chan)]
         (swap! new-worker-awaits dissoc worker-port)
-        (swap! containers assoc id [container-name worker-port worker-name])))
+        (swap! containers assoc id [container-name worker-port worker-name])
+        (println "Cointainer Started")))
     (throw (Exception. "Container started, stop it first"))))
 
 (defn stop-container [id]
   (let [[container-name worker-port worker-name] (@containers id)]
-    ;(sh "docker" "stop" container-name)
-    ;(sh "docker" "remove" container-name)
-    (rfi/invoke worker-name 'hurricane.worker.core/end-worker)))
+    (if @use-docker?
+      (do (sh "docker" "stop" container-name)
+          (sh "docker" "remove" container-name))
+      (rfi/invoke worker-name 'hurricane.worker.core/end-worker))))
 
 (defn new-worker-ready [port server-name]
-  (put! (@new-worker-awaits port) server-name))
+  (if-let [worker-await-chan (@new-worker-awaits port)]
+    (put! worker-await-chan  server-name)
+    (println "Did not waiting for worker" port)) {})

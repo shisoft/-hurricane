@@ -1,7 +1,8 @@
 (ns hurricane.core
   (:gen-class)
   (:require [hurricane.superviser.core :as superviser]
-            [hurricane.worker.core :as worker]))
+            [hurricane.worker.core :as worker]
+            [cluster-connector.utils.for-debug :refer [$ spy]]))
 
 (defn in-args [args & s]
   (let [params
@@ -26,11 +27,12 @@
           superviser-name (in-args "--sn")
           port (#(when % (Integer/parseInt %)) (in-args "--port"))
           id   (in-args "--id")
-          wd   (in-args "--wd")]
+          wd   (in-args "--wd")
+          docker (in-args "--docker")]
       (println "Shisoft Hurricane")
       (case (keyword (first args))
         :superviser
-        (superviser/start-server zk-addr)
+        (superviser/start-server zk-addr docker)
         :worker
         (worker/start-server id port zk-addr superviser-name wd)
         (println (str "Don't know what to do with " args))))))

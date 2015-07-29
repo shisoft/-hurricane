@@ -20,43 +20,54 @@ public class UnzipUtility {
      * @throws IOException
      */
     public static void unzip(String zipFilePath, String destDirectory) throws IOException {
-        File destDir = new File(destDirectory);
-        if (!destDir.exists()) {
-            destDir.mkdir();
+        try
+        {
+            byte[] buf = new byte[1024];
+            ZipInputStream zipinputstream = null;
+            ZipEntry zipentry;
+            zipinputstream = new ZipInputStream(
+                    new FileInputStream(zipFilePath));
+
+            zipentry = zipinputstream.getNextEntry();
+            while (zipentry != null)
+            {
+                //for each entry to be extracted
+                String entryName = zipentry.getName().replace("./", "/");
+                int n;
+                FileOutputStream fileoutputstream;
+                File newFile = new File(entryName);
+                String directory = newFile.getParent();
+
+                if (directory == null)
+                {
+                    if(newFile.isDirectory())
+                        break;
+                }
+
+                String fullPath = destDirectory + entryName;
+                String parentDir = new File(fullPath).getParent();
+
+                new File(parentDir).mkdirs();
+
+                fileoutputstream = new FileOutputStream(fullPath);
+
+                while ((n = zipinputstream.read(buf, 0, 1024)) > -1)
+                    fileoutputstream.write(buf, 0, n);
+
+                fileoutputstream.close();
+                zipinputstream.closeEntry();
+                zipentry = zipinputstream.getNextEntry();
+
+            }//while
+
+            zipinputstream.close();
         }
-        ZipInputStream zipIn = new ZipInputStream(new FileInputStream(zipFilePath));
-        ZipEntry entry = zipIn.getNextEntry();
-        // iterates over entries in the zip file
-        while (entry != null) {
-            String filePath = destDirectory + File.separator + entry.getName();
-            if (!entry.isDirectory()) {
-                // if the entry is a file, extracts it
-                extractFile(zipIn, filePath);
-            } else {
-                // if the entry is a directory, make the directory
-                File dir = new File(filePath);
-                dir.mkdir();
-            }
-            zipIn.closeEntry();
-            entry = zipIn.getNextEntry();
+        catch (Exception e)
+        {
+            e.printStackTrace();
         }
-        zipIn.close();
     }
-    /**
-     * Extracts a zip entry (file entry)
-     * @param zipIn
-     * @param filePath
-     * @throws IOException
-     */
-    private static void extractFile(ZipInputStream zipIn, String filePath) throws IOException {
-        BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(filePath));
-        byte[] bytesIn = new byte[BUFFER_SIZE];
-        int read = 0;
-        while ((read = zipIn.read(bytesIn)) != -1) {
-            bos.write(bytesIn, 0, read);
-        }
-        bos.close();
-    }
+
 
     public static  void writeBytesToFile (byte [] myByteArray, String path) throws IOException {
         FileOutputStream fos = new FileOutputStream(path);
