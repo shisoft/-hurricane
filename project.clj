@@ -8,7 +8,8 @@
                  [com.cemerick/pomegranate "0.3.0"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [leiningen-core "2.5.1"]
-                 [byte-streams "0.2.0"]]
+                 [byte-streams "0.2.0"]
+                 [com.climate/claypoole "1.0.0"]]
   :main ^:skip-aot hurricane.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}}

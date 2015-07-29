@@ -3,23 +3,29 @@
             [cluster-connector.distributed-store.core :refer [join-cluster get-server-list]]
             [clojure.java.io :as io]
             [byte-streams]
-            [hurricane.superviser.core :refer []])
+            [hurricane.superviser.core :refer []]
+            [cluster-connector.utils.for-debug :refer [$]]
+            [com.climate.claypoole :as pool])
   (:import [java.util.zip ZipEntry ZipOutputStream]
            (java.io FileInputStream File)))
 
 (def app-id (atom nil))
 (def worker-group (atom nil))
+(def thread-pool (pool/threadpool 16))
 
 (defn hurr [func-symbol & params]
   (let [str-key (pr-str [symbol params])]
-    (require ($ namespace func-symbol))
+    (require (symbol (namespace func-symbol)))
     (apply rfi/sharded-invoke-with-options str-key func-symbol {:region :hurricane :server-group @worker-group} params)))
 
 (defn hmap [func-symbol coll]
-  (pmap
+  (pool/pmap thread-pool
     (fn [x]
       (hurr func-symbol x))
     coll))
+
+(defn future [func-symbol & params]
+  (pool/future thread-pool (apply hurr symbol params)))
 
 (defn deploy-application [zk-addr & {:keys [region server-group service-port meta] :or {region :app server-group :app meta {}}}]
   (let [app-id- (or service-port (+ 1000 (rand-int 50000)))
