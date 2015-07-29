@@ -30,6 +30,9 @@
     (fn [& _]
       (rfi/stop-server))))
 
+(defn exec-cmd [start-cmd]
+  (. (Runtime/getRuntime) exec (into-array start-cmd)))
+
 (defn start-container [id proj]
   (if-not (@containers id)
     (let [worker-port (next-worker-port)
@@ -67,7 +70,7 @@
                          (str "--wd="   proj-path)
                          (str "--id="   id)])]
         (println start-cmd)
-        (future (. (Runtime/getRuntime) exec (into-array start-cmd))))
+        (future (exec-cmd start-cmd)))
       (println "Container Started, waiting for startup")
       (let [worker-name (<!! await-chan)]
         (swap! new-worker-awaits dissoc worker-port)
@@ -78,8 +81,8 @@
 (defn stop-container [id]
   (let [[container-name worker-port worker-name] (@containers id)]
     (if @use-docker?
-      (do (sh "docker" "stop" container-name)
-          (sh "docker" "remove" container-name))
+      (do (exec-cmd ["docker" "stop" container-name])
+          (exec-cmd ["docker" "remove" container-name]))
       (rfi/invoke worker-name 'hurricane.worker.core/end-worker))))
 
 (defn new-worker-ready [port server-name]

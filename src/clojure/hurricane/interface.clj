@@ -12,6 +12,7 @@
 
 (defn hurr [func-symbol & params]
   (let [str-key (pr-str [symbol params])]
+    (require ($ namespace func-symbol))
     (apply rfi/sharded-invoke-with-options str-key func-symbol {:region :hurricane :server-group @worker-group} params)))
 
 (defn hmap [func-symbol coll]
