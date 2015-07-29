@@ -10,7 +10,6 @@
 (defn eval-in [project form]
   (doseq [path (classpath/get-classpath project)]
     (pomegranate/add-classpath path))
-  (spy form)
   (eval form))
 
 (defn start-server [id port zk-addr superviser-name wd]

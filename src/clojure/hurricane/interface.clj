@@ -17,7 +17,7 @@
 (defn hmap [func-symbol coll]
   (pmap
     (fn [x]
-      (hurr symbol x))
+      (hurr func-symbol x))
     coll))
 
 (defn deploy-application [zk-addr & {:keys [region server-group service-port meta] :or {region :app server-group :app meta {}}}]

@@ -48,6 +48,7 @@
                          "--name" container-name
                          "-v" (str (System/getProperty "user.dir") ":" "/tmp")
                          "-v" (str proj-path ":" "/opt")
+                         "-v" (str "/opt/.m2" ":" "/root/.m2")
                          "-p" (str worker-port ":" worker-port)
                          "-d"
                          "clojure"
